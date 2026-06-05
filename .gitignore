@@ -1,0 +1,17 @@
+.codex/
+.DS_Store
+Thumbs.db
+
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+node_modules/
+.pnp.*
+.yarn/
+
+dist/
+build/
+*.zip

@@ -75,3 +75,9 @@ All controls rely on MSU keybind, so the keybinds can be changed. And all contro
 -   Do the same for the Mods MSU (https://www.nexusmods.com/battlebrothers/mods/479) and Modern Hooks (https://www.nexusmods.com/battlebrothers/mods/685)
 -   Launch the game and load your campaign
 -   Press Ctrl+L on the world map to see the overlay
+
+**Building a release zip**
+
+-   Run `yarn build`
+-   This calls `package.sh` and writes `dist/mod_location_scouting.zip`
+-   The zip contains the contents of `src/` at archive root, which is the layout Battle Brothers expects inside `data/`

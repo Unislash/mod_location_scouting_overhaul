@@ -1,0 +1,9 @@
+{
+  "name": "mod_location_scouting",
+  "private": true,
+  "packageManager": "yarn@4.10.3",
+  "scripts": {
+    "build": "bash package.sh",
+    "package": "bash package.sh"
+  }
+}
