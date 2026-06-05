@@ -1,0 +1,1 @@
+gfx/mod_location_scouting.png
