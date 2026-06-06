@@ -1,3 +1,18 @@
+# Original mod made by /u/HeyPashi
+This is an overhaul of the excellent Battle Brothers mod [mod_location_scouting by /u/HeyPashi](https://www.nexusmods.com/battlebrothers/mods/980). All credit for the idea and approach goes to /u/HeyPashi on reddit.
+
+I made these changes primarily for my own use (100% vibecoded), and published this repo in the hopes that HeyPashi takes my changes into the original mod.
+
+Overhaul Changes include:
+- The edge of the unscouted overlay has a whispy, non-linear, faded edge to reduce the "tiled" look, resulting in a more immersive feel.
+- Unscouted tile overlay is more transparent than the original mod (my preference).
+- Significantly reduce the light "seams" between the grid of unexplored tiles.
+
+There are no plans to publish this overhaul as a new mod to nexusmods.
+
+If you want to install this mod for personal use, clone the repo and run `yarn build` (or, execute `bash build.sh` from the top-level directory) to generate the zip archive and add it to your `Battle Brothers/data` folder.
+
+# Original mod description:
 
 **Summary**  
 This mod makes it easier for you to find Legendary Locations and Camps without Cheating. If you've ever wandered the whole map looking for the Witch Hut or a Camp from a Tavern Rumor and felt like you were going in circles, this is why:  
