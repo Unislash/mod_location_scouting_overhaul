@@ -65,6 +65,9 @@
     // Black fog layer: one detail per tile, mode-driven.
     // Spawned once at load time with Visible=false; refresh only toggles.
     TileOverlays = {},
+    DefaultOverlayBrush = "world_tile_fog_00_v0",
+    OverlayBrushRotationSteps = 0,
+    OverlayBrushDirectionMap = [0, 1, 2, 3, 4, 5],
 
     // Scouting mode constants
     ScoutingModes = {

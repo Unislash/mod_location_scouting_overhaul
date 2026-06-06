@@ -1,9 +1,9 @@
 {
-  "name": "mod_location_scouting",
+  "name": "mod_location_scouting_overhaul",
   "private": true,
   "packageManager": "yarn@4.10.3",
   "scripts": {
-    "build": "bash package.sh",
-    "package": "bash package.sh"
+    "generate-assets": "python3 tools/generate_fog_assets.py",
+    "build": "bash build.sh"
   }
 }
