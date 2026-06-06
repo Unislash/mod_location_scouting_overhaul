@@ -5,8 +5,8 @@ __metadata:
   version: 8
   cacheKey: 10c0
 
-"mod_location_scouting@workspace:.":
+"mod_location_scouting_overhaul@workspace:.":
   version: 0.0.0-use.local
-  resolution: "mod_location_scouting@workspace:."
+  resolution: "mod_location_scouting_overhaul@workspace:."
   languageName: unknown
   linkType: soft
