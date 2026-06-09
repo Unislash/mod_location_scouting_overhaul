@@ -139,6 +139,28 @@
             return result;
         }
 
+        local onCombatLost = o.onCombatLost;
+        o.onCombatLost = function()
+        {
+            // Temporary battlefield locations clear most world detail types
+            // from their tile when they expire. Our overlay lives in
+            // DetailType.Lighting, so battle-site cleanup punches a visible
+            // hole unless we restore the tile immediately afterward.
+            local repairTileID = null;
+            if (this.m.IsBattlesite)
+            {
+                local tile = this.getTile();
+                repairTileID = tile.SquareCoords.X + "_" + tile.SquareCoords.Y;
+            }
+
+            local result = onCombatLost();
+
+            if (repairTileID != null && repairTileID in ::ModLocationScouting.TileCoords)
+                ::ModLocationScouting.respawnOverlay(repairTileID, ::ModLocationScouting.ScoutingMode);
+
+            return result;
+        }
+
     });
 
     ::Hooks.__rawHook(::ModLocationScouting.HooksMod, "scripts/events/events/dlc4/location/icy_cave_enter_event", function(o)
