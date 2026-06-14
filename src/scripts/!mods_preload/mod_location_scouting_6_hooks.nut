@@ -26,6 +26,105 @@
     this.WorldScreen.m.JSHandle.asyncCall("setScoutingButtonState", [this.ScoutingMode]);
 };
 
+// MSU's flagSerialize wraps a string inside a tiny SerializationData program,
+// but the actual string payload still lands in one World.Flags string slot.
+// Battle Brothers stores tag_collection strings with a 16-bit length. Once a
+// scouting string exceeds 65535 bytes, the stored length wraps and the rest of
+// the save stream shifts, producing "Corrupt data before FoW" on load.
+//
+// To stay well below that hard limit, serialize tile IDs as an array of
+// comma-joined chunks, each capped at MaxSerializedTileIDChunkLen.
+::ModLocationScouting.serializeTileIDChunks <- function(_tileTable)
+{
+    local chunks = [];
+    local current = "";
+
+    foreach (id, _ in _tileTable)
+    {
+        if (current.len() == 0)
+        {
+            current = id;
+        }
+        else if (current.len() + 1 + id.len() > this.MaxSerializedTileIDChunkLen)
+        {
+            chunks.push(current);
+            current = id;
+        }
+        else
+        {
+            current += "," + id;
+        }
+    }
+
+    if (current.len() > 0)
+        chunks.push(current);
+
+    return chunks;
+};
+
+::ModLocationScouting.deserializeTileIDChunks <- function(_chunks)
+{
+    local ret = {};
+
+    foreach (chunk in _chunks)
+    {
+        if (chunk == null || chunk.len() == 0)
+            continue;
+
+        foreach (id in split(chunk, ","))
+        {
+            if (id.len() > 0)
+                ret[id] <- true;
+        }
+    }
+
+    return ret;
+};
+
+::ModLocationScouting.deserializeLegacyTileIDString <- function(_serialized)
+{
+    local ret = {};
+
+    if (_serialized.len() == 0)
+        return ret;
+
+    foreach (id in split(_serialized, ","))
+    {
+        if (id.len() > 0)
+            ret[id] <- true;
+    }
+
+    return ret;
+};
+
+::ModLocationScouting.hasSerializedFlag <- function(_id)
+{
+    return ::World.Flags.has(format("MSU.%s.%s", this.ID, _id));
+};
+
+// Remove the old single-string keys once we move to chunked persistence so
+// future saves do not keep carrying dead overflow-prone data alongside the new
+// chunk arrays.
+::ModLocationScouting.clearLegacySerializedTileIDFlags <- function()
+{
+    foreach (legacyID in ["LegendaryScoutedIDs", "CampScoutedIDs"])
+    {
+        local baseFlag = format("MSU.%s.%s", this.ID, legacyID);
+        if (!::World.Flags.has(baseFlag))
+            continue;
+
+        local len = ::World.Flags.get(baseFlag);
+        ::World.Flags.remove(baseFlag);
+
+        for (local i = 0; i < len; ++i)
+        {
+            ::World.Flags.remove(baseFlag + ".type." + i);
+            ::World.Flags.remove(baseFlag + ".data." + i);
+            ::World.Flags.remove(baseFlag + "." + i);
+        }
+    }
+};
+
 ::ModLocationScouting.HooksMod <- ::Hooks.register(::ModLocationScouting.ID, ::ModLocationScouting.Version, ::ModLocationScouting.Name);
 ::ModLocationScouting.HooksMod.queue(">mod_msu", function()
 {
@@ -244,21 +343,18 @@
             // __original leave emulators stranded and crash the next
             // deserialize ("the index 'remove' does not exist").
             //
-            // Tile sets are encoded as comma-separated ID strings rather
-            // than table-of-bools so each tile set is ~3 World.Flags
-            // entries instead of 4N+5. ScoutingMode is intentionally
-            // not persisted; every load forces it back to Off.
+            // Tile sets are encoded as arrays of bounded comma-separated
+            // chunks. That stays compact, but avoids overflowing the
+            // engine's 16-bit string length field once a campaign has
+            // scouted enough tiles. ScoutingMode is intentionally not
+            // persisted; every load forces it back to Off.
             local Mod = ::ModLocationScouting.Mod;
+            local legendaryChunks = ::ModLocationScouting.serializeTileIDChunks(::ModLocationScouting.LegendaryScoutedTiles);
+            local campChunks = ::ModLocationScouting.serializeTileIDChunks(::ModLocationScouting.CampScoutedTiles);
 
-            local legendaryStr = "";
-            foreach (id, _ in ::ModLocationScouting.LegendaryScoutedTiles)
-                legendaryStr += (legendaryStr.len() == 0 ? "" : ",") + id;
-            local campStr = "";
-            foreach (id, _ in ::ModLocationScouting.CampScoutedTiles)
-                campStr += (campStr.len() == 0 ? "" : ",") + id;
-
-            Mod.Serialization.flagSerialize("LegendaryScoutedIDs",     legendaryStr);
-            Mod.Serialization.flagSerialize("CampScoutedIDs",          campStr);
+            ::ModLocationScouting.clearLegacySerializedTileIDFlags();
+            Mod.Serialization.flagSerialize("LegendaryScoutedIDChunks", legendaryChunks);
+            Mod.Serialization.flagSerialize("CampScoutedIDChunks",      campChunks);
             Mod.Serialization.flagSerialize("DiscoveredLocationTypes", ::ModLocationScouting.DiscoveredLocationTypes);
             Mod.Serialization.flagSerialize("IcyCaveCleared",          ::ModLocationScouting.IcyCaveCleared);
             Mod.Serialization.flagSerialize("PresentFromStart",        ::ModLocationScouting.PresentFromStart);
@@ -275,20 +371,30 @@
 
             local Mod = ::ModLocationScouting.Mod;
 
-            // Tile sets: read the comma-separated string and rebuild the
-            // table-of-bools the rest of the code uses for `tileID in
-            // this.X` lookups. Empty string => fresh campaign.
-            local legendaryStr = Mod.Serialization.flagDeserialize("LegendaryScoutedIDs", "");
-            ::ModLocationScouting.LegendaryScoutedTiles = {};
-            if (legendaryStr.len() > 0)
-                foreach (id in split(legendaryStr, ","))
-                    ::ModLocationScouting.LegendaryScoutedTiles[id] <- true;
+            // New saves use chunk arrays. Legacy saves used one giant
+            // comma-separated string per tile set, so fall back to that
+            // format when the chunk keys are absent.
+            if (::ModLocationScouting.hasSerializedFlag("LegendaryScoutedIDChunks"))
+            {
+                local legendaryChunks = Mod.Serialization.flagDeserialize("LegendaryScoutedIDChunks", []);
+                ::ModLocationScouting.LegendaryScoutedTiles = ::ModLocationScouting.deserializeTileIDChunks(legendaryChunks);
+            }
+            else
+            {
+                local legendaryStr = Mod.Serialization.flagDeserialize("LegendaryScoutedIDs", "");
+                ::ModLocationScouting.LegendaryScoutedTiles = ::ModLocationScouting.deserializeLegacyTileIDString(legendaryStr);
+            }
 
-            local campStr = Mod.Serialization.flagDeserialize("CampScoutedIDs", "");
-            ::ModLocationScouting.CampScoutedTiles = {};
-            if (campStr.len() > 0)
-                foreach (id in split(campStr, ","))
-                    ::ModLocationScouting.CampScoutedTiles[id] <- true;
+            if (::ModLocationScouting.hasSerializedFlag("CampScoutedIDChunks"))
+            {
+                local campChunks = Mod.Serialization.flagDeserialize("CampScoutedIDChunks", []);
+                ::ModLocationScouting.CampScoutedTiles = ::ModLocationScouting.deserializeTileIDChunks(campChunks);
+            }
+            else
+            {
+                local campStr = Mod.Serialization.flagDeserialize("CampScoutedIDs", "");
+                ::ModLocationScouting.CampScoutedTiles = ::ModLocationScouting.deserializeLegacyTileIDString(campStr);
+            }
 
             ::ModLocationScouting.DiscoveredLocationTypes = Mod.Serialization.flagDeserialize("DiscoveredLocationTypes", {}, {});
             ::ModLocationScouting.IcyCaveCleared          = Mod.Serialization.flagDeserialize("IcyCaveCleared",          false);

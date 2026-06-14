@@ -68,6 +68,7 @@
     DefaultOverlayBrush = "world_tile_fog_00_v0",
     OverlayBrushRotationSteps = 0,
     OverlayBrushDirectionMap = [0, 1, 2, 3, 4, 5],
+    MaxSerializedTileIDChunkLen = 60000,
 
     // Scouting mode constants
     ScoutingModes = {
