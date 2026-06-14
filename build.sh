@@ -5,7 +5,16 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 src_dir="$repo_root/src"
 dist_dir="$repo_root/dist"
-default_out="$dist_dir/mod_location_scouting.zip"
+package_version="$(
+    python3 - "$repo_root/package.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as fh:
+    print(json.load(fh)["version"])
+PY
+)"
+default_out="$dist_dir/mod_location_scouting_overhaul_${package_version}.zip"
 out_path="${1:-$default_out}"
 
 if [[ ! -d "$src_dir" ]]; then
